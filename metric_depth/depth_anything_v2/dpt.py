@@ -220,3 +220,29 @@ class DepthAnythingV2(nn.Module):
         image = image.to(DEVICE)
         
         return image, (h, w)
+def dynamic_batch_interpolate(ref_view_out, new_H, new_W, max_elements=2 ** 31 - 1):
+    batch_size, C, H, W = ref_view_out.shape
+
+    single_output_size = C * new_H * new_W
+
+    max_batch_per_step = max_elements // single_output_size
+    if max_batch_per_step < 1:
+        raise ValueError("Requested interpolation size is too large for a single sample.")
+
+    out_list = []
+
+    for i in range(0, batch_size, max_batch_per_step):
+        end_idx = min(i + max_batch_per_step, batch_size)
+
+        current_batch = ref_view_out[i:end_idx]
+
+        interpolated_batch = F.interpolate(current_batch,
+                                           size=(new_H, new_W),
+                                           mode='bilinear',
+                                           align_corners=True)
+
+        out_list.append(interpolated_batch)
+
+    out = torch.cat(out_list, dim=0)
+
+    return out
